@@ -1,0 +1,20 @@
+[project]
+name = "test-auth-system"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.118.0",
+    "pydantic[email]>=2.11.9",
+    "pydantic-settings>=2.11.0",
+    "ruff>=0.13.2",
+    "uvicorn>=0.37.0",
+    "sqlalchemy>=2.0.43",
+    "alembic>=1.16.5",
+    "asyncpg>=0.30.0",
+    "python-jose[cryptography]>=3.5.0",
+    "jose>=1.0.0",
+    "passlib>=1.7.4",
+    "argon2>=0.1.10",
+    "argon2-cffi>=25.1.0",
+]

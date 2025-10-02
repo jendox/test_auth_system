@@ -1,0 +1,12 @@
+.env
+.venv/
+env/
+venv/
+.idea/
+__pycache__
+tmp*
+.DS_Store
+frontend/
+run.py
+media/
+_storage
