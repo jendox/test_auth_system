@@ -7,6 +7,7 @@ from src.auth.models import AuthenticatedUser, UserPermissions
 from src.auth.security import get_current_user, get_user_permissions
 from src.notifier import Notifier, get_notifier
 from src.routes.shemas import ConfirmEmailRequest, RegisterRequest, RegisterResponse
+from src.routes.shemas.user import GetMeResponse
 from src.token_manager import TokenVerificationError
 from src.users.repository import AdminDeletion, UserAlreadyActivated, UserAlreadyExists, UserNotFound
 from src.users.use_cases.confirm_email import ConfirmEmailUseCase, get_confirm_email_use_case
@@ -19,14 +20,16 @@ from src.users.use_cases.register import (
 router = APIRouter(prefix="/users", tags=["Users"])
 
 
-# @router.get(
-#     path="/me",
-#     summary="Get current user profile",
-#     description="Retrieve the current authenticated user's profile information.",
-# )
-# async def get_me(
-# ):
-#     return {"detail": "me"}
+@router.get(
+    path="/me",
+    summary="Get current user profile",
+    description="Retrieve the current authenticated user's profile information.",
+    response_model=GetMeResponse,
+)
+async def get_me(
+    user: AuthenticatedUser = Depends(get_current_user),
+):
+    return GetMeResponse(**user.model_dump())
 
 
 @router.post(

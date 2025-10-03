@@ -5,6 +5,7 @@ from pydantic import BaseModel, BeforeValidator, ConfigDict, EmailStr, Field, fi
 from pydantic.alias_generators import to_camel
 from pydantic_core.core_schema import ValidationInfo
 
+from src.auth.models import UserRole
 from src.core.base_types import OptionalStr
 
 PASSWORD_MIN_LENGTH = 8
@@ -89,3 +90,30 @@ class RegisterResponse(BaseModel):
 
 class ConfirmEmailRequest(BaseModel):
     token: str = Field(description="Verification token sent to user's email")
+
+
+class GetMeResponse(BaseModel):
+    id: int
+    email: str
+    is_active: bool
+    role: UserRole
+
+    model_config = ConfigDict(
+        validate_by_alias=True,
+        validate_by_name=True,
+        alias_generator=to_camel,
+        json_schema_extra={
+            "examples": [
+                {
+                    "id": 1,
+                    "email": "user@email.com",
+                    "isActive": True,
+                    "role": {
+                        "id": 1,
+                        "name": "admin",
+                        "description": "Administrator with full access",
+                    },
+                },
+            ],
+        },
+    )

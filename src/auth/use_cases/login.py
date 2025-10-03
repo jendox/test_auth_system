@@ -5,12 +5,8 @@ from fastapi import Depends
 from pydantic import EmailStr
 
 from src.auth.exceptions import AuthenticationError
-from src.auth.repository import (
-    RefreshTokenRepository,
-    UserSessionRepository,
-    get_refresh_token_repo,
-    get_user_session_repo,
-)
+from src.auth.repositories.refresh_token_repo import RefreshTokenRepository, get_refresh_token_repo
+from src.auth.repositories.user_session_repo import UserSessionRepository, get_user_session_repo
 from src.core import security
 from src.core.utils import get_iat_exp_timestamps, get_sha256hash
 from src.routes.shemas.auth import LoginRequest

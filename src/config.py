@@ -3,7 +3,6 @@ from typing import Self
 from pydantic import BaseModel, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
 # app_settings: ContextVar["AppSettings"] = ContextVar("application settings")
 
 
@@ -35,7 +34,7 @@ class AppSettings(BaseSettings):
     jwt: JWTSettings
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file="../.env",
         env_file_encoding="utf-8",
         case_sensitive=False,
         env_nested_delimiter="__",

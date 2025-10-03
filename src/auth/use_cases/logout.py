@@ -2,10 +2,7 @@ from uuid import UUID
 
 from fastapi import Depends
 
-from src.auth.repository import (
-    UserSessionRepository,
-    get_user_session_repo,
-)
+from src.auth.repositories.user_session_repo import UserSessionRepository, get_user_session_repo
 
 
 class LogoutUseCase:

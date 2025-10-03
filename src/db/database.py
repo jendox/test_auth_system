@@ -16,7 +16,7 @@ class Database:
         self.engine: AsyncEngine | None = None
         self.async_session_local: AsyncSession | None = None
 
-    def init_async_sessionmaker(self):
+    def init_async_session_maker(self):
         self.engine = create_async_engine(url=self.url, future=True)
         self.async_session_local = async_sessionmaker(bind=self.engine, expire_on_commit=False)
 
@@ -27,7 +27,7 @@ class Database:
     @asynccontextmanager
     async def get_db_session(self) -> AsyncGenerator[AsyncSession, None]:
         if self.async_session_local is None:
-            self.init_async_sessionmaker()
+            self.init_async_session_maker()
         async with self.async_session_local() as session:
             try:
                 yield session

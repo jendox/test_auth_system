@@ -4,9 +4,8 @@ from typing import Any
 
 from fastapi import FastAPI
 
-import config
+from src import config, routes
 from src.db.database import Database
-from src.routes import auth_router, mock_router, user_router
 
 
 @asynccontextmanager
@@ -27,6 +26,5 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.include_router(user_router)
-app.include_router(auth_router)
-app.include_router(mock_router)
+for router in routes.get_routers():
+    app.include_router(router)

@@ -1,11 +1,9 @@
 from functools import wraps
 
-from fastapi import Depends
 from starlette import status
 from starlette.exceptions import HTTPException
 
 from src.auth.models import PermissionAction, UserPermissions
-from src.auth.security import get_user_permissions
 
 
 def require_permission(resource_type: str, action: PermissionAction):
@@ -13,7 +11,7 @@ def require_permission(resource_type: str, action: PermissionAction):
         @wraps(func)
         async def wrapper(
             *args,
-            permissions: UserPermissions = Depends(get_user_permissions),
+            permissions: UserPermissions,
             **kwargs,
         ):
             if permissions.has_permission(resource_type, action):

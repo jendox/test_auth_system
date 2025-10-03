@@ -1,9 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from starlette import status
 
-from src.auth.exceptions import AuthenticationError
+from src.auth.exceptions import AuthenticationError, TokenNotFound
 from src.auth.models import UserSession
-from src.auth.repository import TokenNotFound
 from src.auth.security import get_user_session
 from src.auth.use_cases import LoginUseCase, RefreshUseCase, get_login_use_case, get_refresh_use_case
 from src.auth.use_cases.logout import LogoutUseCase, get_logout_use_case
@@ -149,7 +148,6 @@ async def refresh_token(
     },
 )
 async def logout(
-    # auth_ctx: AuthenticatedContext = Depends(get_authenticated_context),
     user_session: UserSession = Depends(get_user_session),
     use_case: LogoutUseCase = Depends(get_logout_use_case),
 ):
