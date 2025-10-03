@@ -6,7 +6,7 @@ from fastapi import FastAPI
 
 import config
 from src.db.database import Database
-from src.routes import auth_router, user_router
+from src.routes import auth_router, mock_router, user_router
 
 
 @asynccontextmanager
@@ -29,3 +29,4 @@ app = FastAPI(
 
 app.include_router(user_router)
 app.include_router(auth_router)
+app.include_router(mock_router)

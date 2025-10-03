@@ -18,20 +18,6 @@ class PermissionAction(str, Enum):
     MANAGE = "manage"
 
 
-class Permission(BaseModel):
-    id: int
-    name: str
-    description: str
-    resource_type: str
-    action: PermissionAction
-
-    model_config = ConfigDict(
-        validate_by_alias=True,
-        validate_by_name=True,
-        alias_generator=to_camel,
-    )
-
-
 class UserRole(BaseModel):
     id: int
     name: str
@@ -44,9 +30,30 @@ class UserRole(BaseModel):
     )
 
 
-class UserPermission(BaseModel):
-    permission: Permission
-    granted: bool
+class Permission(BaseModel):
+    resource_type: str
+    action: PermissionAction
+
+
+class UserPermissions(BaseModel):
+    permissions: list[Permission]
+
+    @classmethod
+    def from_dict(cls, perm_dict: dict[str, list[str]]) -> Self:
+        return cls(
+            permissions=[
+                Permission(
+                    resource_type=resource_type.lower(),
+                    action=PermissionAction(action),
+                ) for resource_type, actions in perm_dict.items() for action in actions
+            ],
+        )
+
+    def has_permission(self, resource_type: str, action: PermissionAction) -> bool:
+        return any(
+            permission.resource_type == resource_type.lower() and permission.action == action
+            for permission in self.permissions
+        )
 
 
 class AuthenticatedUser(BaseModel):
@@ -54,7 +61,7 @@ class AuthenticatedUser(BaseModel):
     email: str
     is_active: bool = True
     role: UserRole
-    permissions: list[UserPermission]
+    permissions: UserPermissions | None = None
 
     @classmethod
     def from_entity(cls, user_entity: "UserEntity") -> Self:
@@ -66,18 +73,6 @@ class AuthenticatedUser(BaseModel):
                 name=user_entity.role.name,
                 description=user_entity.role.description,
             ),
-            permissions=[
-                UserPermission(
-                    permission=Permission(
-                        id=p.permission_id,
-                        name=p.permission.name,
-                        description=p.permission.description,
-                        resource_type=p.permission.resource_type.name,
-                        action=PermissionAction(p.permission.action),
-                    ),
-                    granted=p.granted,
-                )
-                for p in user_entity.user_permissions],
         )
 
     model_config = ConfigDict(
@@ -98,28 +93,6 @@ class UserSession(BaseModel):
             id=session.id,
             is_revoked=session.is_revoked,
             expires_at=session.expires_at,
-        )
-
-    model_config = ConfigDict(
-        validate_by_alias=True,
-        validate_by_name=True,
-        alias_generator=to_camel,
-    )
-
-
-class AuthenticatedContext(BaseModel):
-    user: AuthenticatedUser
-    session: UserSession
-
-    @classmethod
-    def from_entities(
-        cls,
-        user: "UserEntity",
-        session: "UserSessionEntity",
-    ) -> Self:
-        return cls(
-            user=AuthenticatedUser.from_entity(user),
-            session=UserSession.from_entity(session),
         )
 
     model_config = ConfigDict(

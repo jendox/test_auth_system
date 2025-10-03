@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.db.database import get_db_session
-from src.db.models import UserEntity, UserPermissionEntity, UserRoleEntity
+from src.db.models import UserEntity
 
 
 class UserAlreadyExists(Exception): ...
@@ -46,10 +46,7 @@ class UserRepository:
     async def get_by_email(self, email: EmailStr) -> UserEntity:
         stmt = (
             select(UserEntity)
-            .options(
-                selectinload(UserEntity.role).selectinload(UserRoleEntity.role_permissions),
-                selectinload(UserEntity.user_permissions).selectinload(UserPermissionEntity.permission),
-            )
+            .options(selectinload(UserEntity.role))
             .where(UserEntity.email == str(email))
         )
         user = await self._session.scalar(stmt)
@@ -60,10 +57,7 @@ class UserRepository:
     async def get_by_id(self, user_id: int) -> UserEntity:
         stmt = (
             select(UserEntity)
-            .options(
-                selectinload(UserEntity.role).selectinload(UserRoleEntity.role_permissions),
-                selectinload(UserEntity.user_permissions).selectinload(UserPermissionEntity.permission),
-            )
+            .options(selectinload(UserEntity.role))
             .where(UserEntity.id == user_id)
         )
         user = await self._session.scalar(stmt)
@@ -81,7 +75,7 @@ class UserRepository:
     async def mark_as_inactive(self, user_id: int) -> None:
         user = await self.get_by_id(user_id)
         if user.role.name == "admin":
-            raise AdminDeletion("Admin deletion forbidden")
+            raise AdminDeletion()
         user.is_active = False
         await self._session.commit()
 

@@ -8,7 +8,16 @@ from sqlalchemy.orm import joinedload, selectinload
 
 from src.core.utils import get_iat_exp_timestamps
 from src.db.database import get_db_session
-from src.db.models import RefreshTokenEntity, UserEntity, UserSessionEntity
+from src.db.models import (
+    PermissionEntity,
+    RefreshTokenEntity,
+    ResourceTypeEntity,
+    RolePermissionEntity,
+    UserEntity,
+    UserPermissionEntity,
+    UserRoleEntity,
+    UserSessionEntity,
+)
 
 
 class TokenNotFound(Exception): ...
@@ -131,7 +140,7 @@ def get_refresh_token_repo(
 
 class UserSessionRepository:
     def __init__(self, session: AsyncSession):
-        self.session = session
+        self._session = session
 
     async def create(self, user_id: int, expires_at: int) -> UUID:
         user_session = UserSessionEntity(
@@ -139,25 +148,14 @@ class UserSessionRepository:
             user_id=user_id,
             expires_at=expires_at,
         )
-        self.session.add(user_session)
-        await self.session.commit()
+        self._session.add(user_session)
+        await self._session.commit()
         return user_session.id
 
     async def get_active(self, session_id: UUID) -> UserSessionEntity:
         now, __ = get_iat_exp_timestamps()
         stmt = (
             select(UserSessionEntity)
-            .options(
-                joinedload(UserSessionEntity.user)
-                .options(
-                    selectinload(
-                        UserEntity.role,
-                    ),
-                    selectinload(
-                        UserEntity.user_permissions,
-                    ),
-                ),
-            )
             .where(
                 and_(
                     UserSessionEntity.id == session_id,
@@ -166,7 +164,7 @@ class UserSessionRepository:
                 ),
             )
         )
-        session = await self.session.scalar(stmt)
+        session = await self._session.scalar(stmt)
         if session is None:
             raise UserSessionNotFound("User session not found")
         return session
@@ -184,7 +182,7 @@ class UserSessionRepository:
                 ),
             )
         )
-        session = await self.session.scalar(stmt)
+        session = await self._session.scalar(stmt)
         if session is None:
             raise UserSessionNotFound("User session not found")
         return session
@@ -195,8 +193,8 @@ class UserSessionRepository:
             .where(UserSessionEntity.id == session_id)
             .values(is_revoked=True)
         )
-        result = await self.session.execute(stmt)
-        await self.session.commit()
+        result = await self._session.execute(stmt)
+        await self._session.commit()
         return result.rowcount > 0
 
 
@@ -204,3 +202,45 @@ def get_user_session_repo(
     session: AsyncSession = Depends(get_db_session),
 ) -> UserSessionRepository:
     return UserSessionRepository(session)
+
+
+class PermissionRepository:
+    def __init__(self, session: AsyncSession):
+        self._session = session
+
+    async def get_user_permissions(self, user_id: int) -> dict[str, list[str]]:
+        """Возвращает permissions в виде {resource_type: [action1, action2]}"""
+        stmt = (
+            select(ResourceTypeEntity.name, PermissionEntity.action)
+            .select_from(PermissionEntity)
+            .join(ResourceTypeEntity, ResourceTypeEntity.id == PermissionEntity.resource_type_id)
+            .join(UserPermissionEntity, UserPermissionEntity.permission_id == PermissionEntity.id)
+            .where(
+                UserPermissionEntity.user_id == user_id,
+                UserPermissionEntity.granted.is_(True),
+            )
+            .union_all(
+                select(ResourceTypeEntity.name, PermissionEntity.action)
+                .select_from(PermissionEntity)
+                .join(ResourceTypeEntity, ResourceTypeEntity.id == PermissionEntity.resource_type_id)
+                .join(RolePermissionEntity, RolePermissionEntity.permission_id == PermissionEntity.id)
+                .join(UserRoleEntity, UserRoleEntity.id == RolePermissionEntity.role_id)
+                .join(UserEntity, UserEntity.role_id == UserRoleEntity.id)
+                .where(UserEntity.id == user_id),
+            )
+        )
+
+        result = await self._session.execute(stmt)
+        permissions_dict = {}
+        for resource_type, action in result.all():
+            if resource_type not in permissions_dict:
+                permissions_dict[resource_type] = []
+            permissions_dict[resource_type].append(action)
+
+        return permissions_dict
+
+
+def get_permission_repo(
+    session: AsyncSession = Depends(get_db_session),
+) -> PermissionRepository:
+    return PermissionRepository(session)

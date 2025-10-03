@@ -2,6 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, Path
 from starlette import status
 from starlette.responses import JSONResponse
 
+from src.auth.exceptions import InsufficientPermissions
+from src.auth.models import AuthenticatedUser, UserPermissions
+from src.auth.security import get_current_user, get_user_permissions
 from src.notifier import Notifier, get_notifier
 from src.routes.shemas import ConfirmEmailRequest, RegisterRequest, RegisterResponse
 from src.token_manager import TokenVerificationError
@@ -138,18 +141,38 @@ async def confirm_registration(
 @router.delete(
     path="/{user_id}",
     summary="Delete user",
-    description="Delete the user by its id.",
-    status_code=status.HTTP_204_NO_CONTENT,
+    description="""Delete user by ID.\n
+        - Users can delete their own account without special permissions\n
+        - Deleting other users requires 'user:delete' permission\n
+        - Admin users cannot be deleted""",
+    status_code=status.HTTP_200_OK,
     responses={
-        status.HTTP_204_NO_CONTENT: {
+        status.HTTP_200_OK: {
             "description": "User successfully deleted",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "User deleted successfully.",
+                    },
+                },
+            },
+        },
+        status.HTTP_403_FORBIDDEN: {
+            "description": "Insufficient permissions to delete other users",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Insufficient permissions to delete other users.",
+                    },
+                },
+            },
         },
         status.HTTP_404_NOT_FOUND: {
             "description": "User not found",
             "content": {
                 "application/json": {
                     "example": {
-                        "detail": "User not found",
+                        "detail": "User not found.",
                     },
                 },
             },
@@ -168,10 +191,12 @@ async def confirm_registration(
 )
 async def delete(
     user_id: int = Path(gt=0, description="User ID (must be positive integer)"),
+    user: AuthenticatedUser = Depends(get_current_user),
+    permissions: UserPermissions = Depends(get_user_permissions),
     use_case: DeleteUserUseCase = Depends(get_delete_user_use_case),
 ):
     try:
-        await use_case(user_id)
+        await use_case(user_id, user.id, permissions)
     except UserNotFound:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -181,4 +206,9 @@ async def delete(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Cannot delete admin user",
+        )
+    except InsufficientPermissions:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to delete other users.",
         )

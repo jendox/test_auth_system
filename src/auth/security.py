@@ -7,19 +7,63 @@ from starlette.exceptions import HTTPException
 
 from src.token_manager import TokenManager, TokenVerificationError, get_token_manager
 
-from .models import AuthenticatedContext
-from .repository import UserSessionNotFound, UserSessionRepository, get_user_session_repo
+from .models import AuthenticatedUser, UserPermissions, UserSession
+from .repository import (
+    PermissionRepository,
+    UserSessionNotFound,
+    UserSessionRepository,
+    get_permission_repo,
+    get_user_session_repo,
+)
+from ..users.repository import UserRepository, get_user_repo
 
 
-async def get_authenticated_context(
+async def get_user_session(
     auth: HTTPAuthorizationCredentials = Depends(HTTPBearer()),
     token_manager: TokenManager = Depends(get_token_manager),
     session_repo: UserSessionRepository = Depends(get_user_session_repo),
-) -> AuthenticatedContext:
+) -> UserSession:
     try:
         payload = token_manager.verify_access_token(auth.credentials)
         session = await session_repo.get_active(UUID(payload.sid))
-        return AuthenticatedContext.from_entities(session.user, session)
+        return UserSession(
+            id=session.id,
+            is_revoked=session.is_revoked,
+            expires_at=session.expires_at,
+        )
+    except (TokenVerificationError, UserSessionNotFound):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token.",
+        )
+
+
+async def get_user_permissions(
+    auth: HTTPAuthorizationCredentials = Depends(HTTPBearer()),
+    token_manager: TokenManager = Depends(get_token_manager),
+    permission_repo: PermissionRepository = Depends(get_permission_repo),
+) -> UserPermissions:
+    try:
+        payload = token_manager.verify_access_token(auth.credentials)
+        user_id = int(payload.sub)
+        permissions = await permission_repo.get_user_permissions(user_id)
+        return UserPermissions.from_dict(permissions)
+    except TokenVerificationError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token.",
+        )
+
+
+async def get_current_user(
+    auth: HTTPAuthorizationCredentials = Depends(HTTPBearer()),
+    token_manager: TokenManager = Depends(get_token_manager),
+    user_repo: UserRepository = Depends(get_user_repo),
+) -> AuthenticatedUser:
+    try:
+        payload = token_manager.verify_access_token(auth.credentials)
+        user = await user_repo.get_by_id(int(payload.sub))
+        return AuthenticatedUser.from_entity(user)
     except (TokenVerificationError, UserSessionNotFound):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
