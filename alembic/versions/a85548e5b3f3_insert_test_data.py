@@ -170,7 +170,7 @@ def upgrade() -> None:
             'id': 1,
             'name': 'Admin User',
             'email': 'admin@example.com',
-            'hashed_password': password_hasher.hash_password("gfhnfx"),
+            'hashed_password': hashed_password,
             'is_active': True,
             'role_id': 1,
             'created_at': current_time,
