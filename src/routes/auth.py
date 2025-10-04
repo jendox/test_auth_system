@@ -4,9 +4,15 @@ from starlette import status
 from src.auth.exceptions import AuthenticationError, TokenNotFound
 from src.auth.models import UserSession
 from src.auth.security import get_user_session
-from src.auth.use_cases import LoginUseCase, RefreshUseCase, get_login_use_case, get_refresh_use_case
-from src.auth.use_cases.logout import LogoutUseCase, get_logout_use_case
-from src.routes.shemas.auth import LoginRequest, RefreshRequest, TokenResponse
+from src.auth.use_cases import (
+    LoginUseCase,
+    LogoutUseCase,
+    RefreshUseCase,
+    get_login_use_case,
+    get_logout_use_case,
+    get_refresh_use_case,
+)
+from src.routes.shemas import LoginRequest, RefreshRequest, TokenResponse
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 

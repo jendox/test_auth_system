@@ -11,14 +11,37 @@ from src.core.utils import get_iat_exp_timestamps
 from src.db.database import get_db_session
 from src.db.models import RefreshTokenEntity, UserEntity, UserSessionEntity
 
+__all__ = (
+    "RefreshTokenRepository",
+    "get_refresh_token_repo",
+)
+
 
 class RefreshTokenRepository(BaseDBRepository):
+    """
+    Repository for refresh token database operations.
+
+    Handles creation, retrieval, and revocation of refresh tokens
+    with comprehensive validation for secure token management.
+    """
+
     async def create(
         self,
         session_id: UUID,
         token_hash: str,
         expires_at: int,
     ) -> RefreshTokenEntity:
+        """
+        Create a new refresh token for a user session.
+
+        Args:
+            session_id: UUID of the user session
+            token_hash: SHA-256 hash of the refresh token
+            expires_at: Expiration timestamp for the token
+
+        Returns:
+            RefreshTokenEntity: The created refresh token entity
+        """
         token = RefreshTokenEntity(
             session_id=session_id,
             token_hash=token_hash,
@@ -107,4 +130,13 @@ class RefreshTokenRepository(BaseDBRepository):
 def get_refresh_token_repo(
     session: AsyncSession = Depends(get_db_session),
 ) -> RefreshTokenRepository:
+    """
+    Dependency injection function to get RefreshTokenRepository instance.
+
+    Args:
+        session: Database session injected by FastAPI
+
+    Returns:
+        RefreshTokenRepository instance configured with database session
+    """
     return RefreshTokenRepository(session)

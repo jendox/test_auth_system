@@ -16,6 +16,11 @@ from src.db.models import (
     UserRoleEntity,
 )
 
+__all__ = (
+    "PermissionRepository",
+    "get_permissions_repo",
+)
+
 
 def _permission_dict_from_result(result: Result[Any]) -> dict[str, list[str]]:
     permissions = {}
@@ -45,7 +50,26 @@ def _apply_user_permissions(
 
 
 class PermissionRepository(BaseDBRepository):
-    async def get_all_user_permissions(self, user_id: int):
+    """
+    Repository for permission-related database operations.
+
+    Handles retrieval and modification of user permissions, combining
+    role-based permissions with individual user permissions.
+    """
+
+    async def get_all_user_permissions(self, user_id: int) -> dict[str, list[str]]:
+        """
+        Retrieve all permissions for a user including role and individual permissions.
+
+        Combines permissions from the user's role with any user-specific
+        permission grants or revocations.
+
+        Args:
+            user_id: ID of the user to get permissions for
+
+        Returns:
+            Dictionary of permissions grouped by resource type
+        """
         role_perm_stmt = (
             select(ResourceTypeEntity.name, PermissionEntity.action)
             .select_from(UserEntity)
@@ -77,7 +101,22 @@ class PermissionRepository(BaseDBRepository):
         permission_name: str,
         granted: bool,
         granted_by: int,
-    ):
+    ) -> None:
+        """
+        Grant or revoke a specific permission for a user.
+
+        Creates or updates a user-specific permission record that overrides
+        the user's role-based permissions.
+
+        Args:
+            user_id: ID of the user to modify permissions for
+            permission_name: Name of the permission to set
+            granted: Whether to grant (True) or revoke (False) the permission
+            granted_by: ID of the user performing this action
+
+        Raises:
+            PermissionNotFound: If the specified permission doesn't exist
+        """
         permission = await self._session.scalar(
             select(PermissionEntity).where(PermissionEntity.name == permission_name),
         )
@@ -104,4 +143,13 @@ class PermissionRepository(BaseDBRepository):
 def get_permissions_repo(
     session: AsyncSession = Depends(get_db_session),
 ) -> PermissionRepository:
+    """
+    Dependency injection function to get PermissionRepository instance.
+
+    Args:
+        session: Database session injected by FastAPI
+
+    Returns:
+        PermissionRepository instance configured with database session
+    """
     return PermissionRepository(session)

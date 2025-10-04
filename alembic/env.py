@@ -15,7 +15,7 @@ from src.db.base_models import Base
 config = context.config
 
 settings = AppSettings.load()
-config.set_main_option("sqlalchemy.url", settings.database.url)
+config.set_main_option("sqlalchemy.url", settings.database.async_postgres_url)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

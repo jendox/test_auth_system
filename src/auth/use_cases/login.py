@@ -5,18 +5,35 @@ from fastapi import Depends
 from pydantic import EmailStr
 
 from src.auth.exceptions import AuthenticationError
-from src.auth.repositories.refresh_token_repo import RefreshTokenRepository, get_refresh_token_repo
-from src.auth.repositories.user_session_repo import UserSessionRepository, get_user_session_repo
+from src.auth.repositories import (
+    RefreshTokenRepository,
+    UserSessionRepository,
+    get_refresh_token_repo,
+    get_user_session_repo,
+)
 from src.core import security
 from src.core.utils import get_iat_exp_timestamps, get_sha256hash
 from src.routes.shemas.auth import LoginRequest
 from src.token_manager import TokenManager, TokenPair, get_token_manager
-from src.users.repository import UserNotFound, UserRepository, get_user_repo
+from src.users.exceptions import UserNotFound
+from src.users.repositories import UserRepository, get_user_repo
+
+__all__ = (
+    "LoginUseCase",
+    "get_login_use_case",
+)
 
 REMEMBER_ME_REFRESH_TOKEN_TTL = 14  # 2 week session
 
 
 class LoginUseCase:
+    """
+    Use case for user authentication and login process.
+
+    Handles the complete login flow including credential verification,
+    session creation, token generation, and secure token storage.
+    """
+
     def __init__(
         self,
         user_repo: UserRepository,
@@ -81,6 +98,19 @@ def get_login_use_case(
     user_session_repo: UserSessionRepository = Depends(get_user_session_repo),
     token_repo: RefreshTokenRepository = Depends(get_refresh_token_repo),
     token_manager: TokenManager = Depends(get_token_manager),
-    password_hasher: security.PasswordHasher = Depends(security.get_password_hasher),
+    password_hasher: security.PasswordHasher = Depends(security.get_argon2_password_hasher),
 ) -> LoginUseCase:
+    """
+    Dependency injection function to get LoginUseCase instance.
+
+    Args:
+        user_repo: User repository instance
+        user_session_repo: User session repository instance
+        token_repo: Refresh token repository instance
+        token_manager: Token manager instance
+        password_hasher: Password hasher instance
+
+    Returns:
+        LoginUseCase instance configured with all dependencies
+    """
     return LoginUseCase(user_repo, user_session_repo, token_repo, token_manager, password_hasher)

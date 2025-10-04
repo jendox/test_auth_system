@@ -4,11 +4,21 @@ from pydantic.alias_generators import to_camel
 from src.routes.shemas.user import PASSWORD_MAX_LENGTH
 from src.token_manager import AccessToken, RefreshToken
 
+__all__ = (
+    "LoginRequest",
+    "TokenResponse",
+    "RefreshRequest",
+)
+
 
 class LoginRequest(BaseModel):
+    """Request model for user login."""
     email: EmailStr
+    """User's email address"""
     password: str = Field(max_length=PASSWORD_MAX_LENGTH)
+    """User's password"""
     remember_me: bool = Field(default=False, description="Set the session TTL to 14 days")
+    """Flag to extend session duration to 14 days"""
 
     model_config = ConfigDict(
         validate_by_alias=True,
@@ -19,7 +29,7 @@ class LoginRequest(BaseModel):
             "examples": [
                 {
                     "email": "user@example.com",
-                    "password": "Qwerty!123",
+                    "password": "Qwerty!234",
                     "rememberMe": True,
                 },
             ],
@@ -28,8 +38,11 @@ class LoginRequest(BaseModel):
 
 
 class TokenResponse(BaseModel):
+    """Response model for authentication tokens."""
     access_token: AccessToken
+    """Access token for API authorization"""
     refresh_token: RefreshToken
+    """Refresh token for obtaining a new access token"""
 
     model_config = ConfigDict(
         validate_by_alias=True,
@@ -56,7 +69,9 @@ class TokenResponse(BaseModel):
 
 
 class RefreshRequest(BaseModel):
-    refresh_token: str = Field(description="Valid refresh token to obtain new access token")
+    """Request model for token refresh."""
+    refresh_token: str
+    """Valid refresh token to obtain new access token"""
 
     model_config = ConfigDict(
         validate_by_alias=True,

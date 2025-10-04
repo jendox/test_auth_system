@@ -1,20 +1,32 @@
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import APIRouter, Depends, HTTPException
 from starlette import status
 from starlette.responses import JSONResponse
 
-from src.auth.exceptions import InsufficientPermissions
-from src.auth.models import AuthenticatedUser, UserPermissions
-from src.auth.security import get_current_user, get_user_permissions
+from src.auth.exceptions import AuthenticationError
+from src.auth.models import AuthenticatedUser, UserSession
+from src.auth.security import get_current_user, get_user_session
 from src.notifier import Notifier, get_notifier
-from src.routes.shemas import ConfirmEmailRequest, RegisterRequest, RegisterResponse
-from src.routes.shemas.user import GetMeResponse
+from src.routes.shemas import (
+    ChangePasswordRequest,
+    ConfirmEmailRequest,
+    GetMeResponse,
+    RegisterRequest,
+    RegisterResponse,
+    UpdateProfileRequest,
+)
 from src.token_manager import TokenVerificationError
-from src.users.repository import AdminDeletion, UserAlreadyActivated, UserAlreadyExists, UserNotFound
-from src.users.use_cases.confirm_email import ConfirmEmailUseCase, get_confirm_email_use_case
-from src.users.use_cases.delete import DeleteUserUseCase, get_delete_user_use_case
-from src.users.use_cases.register import (
+from src.users.exceptions import AdminDeletion, UserAlreadyActivated, UserAlreadyExists, UserRoleNotFound
+from src.users.use_cases import (
+    ChangePasswordUseCase,
+    ConfirmEmailUseCase,
+    DeleteMeUseCase,
     RegisterUserUseCase,
+    UpdateProfileUseCase,
+    get_change_password_use_case,
+    get_confirm_email_use_case,
+    get_delete_me_use_case,
     get_register_user_use_case,
+    get_update_profile_use_case,
 )
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -25,11 +37,101 @@ router = APIRouter(prefix="/users", tags=["Users"])
     summary="Get current user profile",
     description="Retrieve the current authenticated user's profile information.",
     response_model=GetMeResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_200_OK: {
+            "description": "User profile retrieved successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "id": "1",
+                        "email": "user@example.com",
+                        "first_name": "John",
+                        "role": "user",
+                        "is_active": True,
+                    },
+                },
+            },
+        },
+        status.HTTP_401_UNAUTHORIZED: {
+            "description": "Authentication required",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Not authenticated",
+                    },
+                },
+            },
+        },
+    },
 )
 async def get_me(
     user: AuthenticatedUser = Depends(get_current_user),
 ):
     return GetMeResponse(**user.model_dump())
+
+
+@router.delete(
+    path="/me",
+    summary="Delete user profile",
+    description="Delete current user's profile.",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        status.HTTP_204_NO_CONTENT: {
+            "description": "Profile deleted successfully",
+        },
+        status.HTTP_401_UNAUTHORIZED: {
+            "description": "Authentication required",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Not authenticated.",
+                    },
+                },
+            },
+        },
+    },
+)
+async def delete_me(
+    user_session: UserSession = Depends(get_user_session),
+    use_case: DeleteMeUseCase = Depends(get_delete_me_use_case),
+):
+    try:
+        await use_case(user_session.user_id, user_session.id)
+    except AdminDeletion:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot delete admin user",
+        )
+
+
+@router.put(
+    path="/me",
+    summary="Update user profile",
+    description="Update current user's profile information such as name.",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        status.HTTP_204_NO_CONTENT: {
+            "description": "Profile updated successfully",
+        },
+        status.HTTP_401_UNAUTHORIZED: {
+            "description": "Authentication required",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Not authenticated.",
+                    },
+                },
+            },
+        },
+    },
+)
+async def update_profile(
+    payload: UpdateProfileRequest,
+    user: AuthenticatedUser = Depends(get_current_user),
+    use_case: UpdateProfileUseCase = Depends(get_update_profile_use_case),
+):
+    await use_case(user.id, payload.name)
 
 
 @router.post(
@@ -47,6 +149,16 @@ async def get_me(
                         "id": "1",
                         "email": "user@example.com",
                         "message": "Registration successful. Please check your email for verification.",
+                    },
+                },
+            },
+        },
+        status.HTTP_400_BAD_REQUEST: {
+            "description": "User role doesn't exist",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "User role 'superboss' not found.",
                     },
                 },
             },
@@ -77,6 +189,8 @@ async def register(
             message=f"Registration successful. "
                     f"Please check your email for verification. Token={token}",
         )
+    except UserRoleNotFound as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except UserAlreadyExists as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
 
@@ -141,77 +255,55 @@ async def confirm_registration(
         )
 
 
-@router.delete(
-    path="/{user_id}",
-    summary="Delete user",
-    description="""Delete user by ID.\n
-        - Users can delete their own account without special permissions\n
-        - Deleting other users requires 'user:delete' permission\n
-        - Admin users cannot be deleted""",
-    status_code=status.HTTP_200_OK,
+@router.put(
+    path="/me/password",
+    summary="Change user password",
+    description="Change current user's password with current password verification.",
+    status_code=status.HTTP_204_NO_CONTENT,
     responses={
-        status.HTTP_200_OK: {
-            "description": "User successfully deleted",
+        status.HTTP_204_NO_CONTENT: {
+            "description": "Password changed successfully",
+        },
+        status.HTTP_422_UNPROCESSABLE_CONTENT: {
+            "description": "Invalid password or validation error",
             "content": {
                 "application/json": {
                     "example": {
-                        "detail": "User deleted successfully.",
+                        "WeakPassword": {
+                            "value": {
+                                "detail": "Password must contain at least one uppercase letter.",
+                            },
+                        },
+                        "InvalidPassword": {
+                            "value": {
+                                "detail": "Current password is incorrect.",
+                            },
+                        },
                     },
                 },
             },
         },
-        status.HTTP_403_FORBIDDEN: {
-            "description": "Insufficient permissions to delete other users",
+        status.HTTP_401_UNAUTHORIZED: {
+            "description": "Authentication required",
             "content": {
                 "application/json": {
                     "example": {
-                        "detail": "Insufficient permissions to delete other users.",
-                    },
-                },
-            },
-        },
-        status.HTTP_404_NOT_FOUND: {
-            "description": "User not found",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "detail": "User not found.",
-                    },
-                },
-            },
-        },
-        status.HTTP_409_CONFLICT: {
-            "description": "Delete user failed due to business logic constraint",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "detail": "Cannot delete admin user.",
+                        "detail": "Not authenticated.",
                     },
                 },
             },
         },
     },
 )
-async def delete(
-    user_id: int = Path(gt=0, description="User ID (must be positive integer)"),
+async def change_password(
+    payload: ChangePasswordRequest,
     user: AuthenticatedUser = Depends(get_current_user),
-    permissions: UserPermissions = Depends(get_user_permissions),
-    use_case: DeleteUserUseCase = Depends(get_delete_user_use_case),
+    use_case: ChangePasswordUseCase = Depends(get_change_password_use_case),
 ):
     try:
-        await use_case(user_id, user.id, permissions)
-    except UserNotFound:
+        await use_case(user.id, payload.current_password, payload.new_password)
+    except AuthenticationError:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
-        )
-    except AdminDeletion:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Cannot delete admin user",
-        )
-    except InsufficientPermissions:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions to delete other users.",
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Current password is incorrect.",
         )

@@ -5,7 +5,7 @@ from src.auth.models import PermissionAction, UserPermissions
 from src.auth.permissions_decorator import require_permission
 from src.auth.security import get_user_permissions
 
-router = APIRouter(prefix="/mock-api", tags=["MockAPI"])
+router = APIRouter(prefix="/mock-api", tags=["Mock API"])
 
 MOCK_PRODUCTS = [
     {"id": 1, "name": "Laptop", "price": 999.99, "category": "Electronics"},

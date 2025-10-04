@@ -8,6 +8,15 @@ from pydantic_core.core_schema import ValidationInfo
 from src.auth.models import UserRole
 from src.core.base_types import OptionalStr
 
+__all__ = (
+    "RegisterRequest",
+    "RegisterResponse",
+    "ConfirmEmailRequest",
+    "GetMeResponse",
+    "UpdateProfileRequest",
+    "ChangePasswordRequest",
+)
+
 PASSWORD_MIN_LENGTH = 8
 PASSWORD_MAX_LENGTH = 64
 
@@ -33,8 +42,11 @@ PasswordStr = Annotated[
 
 
 class PasswordConfirmationMixin(BaseModel):
+    """Mixin for password confirmation validation."""
     new_password: Annotated[PasswordStr, BeforeValidator(_validate_password)]
+    """New password meeting security requirements"""
     confirm_password: PasswordStr
+    """Password confirmation that must match new_password"""
 
     @field_validator("confirm_password", mode="after")
     @classmethod
@@ -46,8 +58,21 @@ class PasswordConfirmationMixin(BaseModel):
 
 
 class RegisterRequest(PasswordConfirmationMixin):
+    """Request model for user registration.
+
+    Attributes:
+        name: User's full name (optional)
+        email: User's email address
+        user_role: User's role
+        new_password: Secure password for the account
+        confirm_password: Password confirmation
+    """
     name: OptionalStr = Field(max_length=32)
+    """User's full name (optional)"""
     email: EmailStr = Field(max_length=254)
+    """User's email address"""
+    user_role: str = Field(max_length=32)
+    """User's role"""
 
     model_config = ConfigDict(
         extra="forbid",
@@ -57,8 +82,9 @@ class RegisterRequest(PasswordConfirmationMixin):
         json_schema_extra={
             "examples": [
                 {
-                    "name": "Name",
+                    "name": "John Leonard",
                     "email": "user@example.com",
+                    "user_role": "user",
                     "newPassword": "Qwerty!234",
                     "confirmPassword": "Qwerty!234",
                 },
@@ -68,9 +94,13 @@ class RegisterRequest(PasswordConfirmationMixin):
 
 
 class RegisterResponse(BaseModel):
+    """Response model for user registration."""
     id: int
+    """Unique identifier of the newly created user"""
     email: EmailStr
+    """Registered email address"""
     message: OptionalStr
+    """Optional success or informational message"""
 
     model_config = ConfigDict(
         extra="forbid",
@@ -89,14 +119,23 @@ class RegisterResponse(BaseModel):
 
 
 class ConfirmEmailRequest(BaseModel):
-    token: str = Field(description="Verification token sent to user's email")
+    """Request model for email confirmation."""
+    token: str
+    """Verification token sent to user's email"""
 
 
 class GetMeResponse(BaseModel):
+    """Response model for current user profile information."""
     id: int
+    """User's unique identifier"""
+    name: str
+    """User's full name"""
     email: str
+    """User's email address"""
     is_active: bool
+    """Account activation status"""
     role: UserRole
+    """User's role information"""
 
     model_config = ConfigDict(
         validate_by_alias=True,
@@ -106,6 +145,7 @@ class GetMeResponse(BaseModel):
             "examples": [
                 {
                     "id": 1,
+                    "name": "John",
                     "email": "user@email.com",
                     "isActive": True,
                     "role": {
@@ -113,6 +153,55 @@ class GetMeResponse(BaseModel):
                         "name": "admin",
                         "description": "Administrator with full access",
                     },
+                },
+            ],
+        },
+    )
+
+
+class UpdateProfileRequest(BaseModel):
+    """Request model for updating user profile."""
+    name: str = Field(max_length=32)
+    """User's full name"""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_by_alias=True,
+        validate_by_name=True,
+        alias_generator=to_camel,
+        json_schema_extra={
+            "examples": [
+                {
+                    "name": "John Smith",
+                },
+            ],
+        },
+    )
+
+
+class ChangePasswordRequest(PasswordConfirmationMixin):
+    """
+    Request model for changing user password.
+
+    Attributes:
+        current_password: User's current password for verification
+        new_password: New secure password
+        confirm_password: Password confirmation
+    """
+    current_password: str = Field(max_length=PASSWORD_MAX_LENGTH)
+    """User's current password for verification"""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_by_alias=True,
+        validate_by_name=True,
+        alias_generator=to_camel,
+        json_schema_extra={
+            "examples": [
+                {
+                    "currentPassword": "Qwerty!234",
+                    "newPassword": "NewQwerty!234",
+                    "confirmPassword": "NewQwerty!234",
                 },
             ],
         },

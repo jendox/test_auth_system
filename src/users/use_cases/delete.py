@@ -1,30 +1,43 @@
+import uuid
+
 from fastapi import Depends
 
-from src.auth.exceptions import InsufficientPermissions
-from src.auth.models import PermissionAction, UserPermissions
-from src.users.repository import UserRepository, get_user_repo
+from src.auth.repositories import UserSessionRepository, get_user_session_repo
+from src.users.repositories import UserRepository, get_user_repo
+
+__all__ = (
+    "DeleteMeUseCase",
+    "get_delete_me_use_case",
+)
 
 
-class DeleteUserUseCase:
-    def __init__(self, user_repo: UserRepository):
-        self.user_repo = user_repo
+class DeleteMeUseCase:
+    """
+    Use case for deleting current user accounts.
 
-    async def __call__(
-        self,
-        user_id: int,
-        current_user_id: int,
-        permissions: UserPermissions,
-    ) -> str:
-        if user_id == current_user_id:
-            await self.user_repo.mark_as_inactive(user_id)
-            return "Your account has been deleted."
-        if permissions.has_permission("user", PermissionAction.DELETE):
-            await self.user_repo.mark_as_inactive(user_id)
-            return "User deleted successfully."
-        raise InsufficientPermissions()
+    Handles business logic for user deletion with proper authorization checks.
+    """
+    def __init__(self, user_repo: UserRepository, session_repo: UserSessionRepository):
+        self._user_repo = user_repo
+        self._session_repo = session_repo
+
+    async def __call__(self, user_id: int, session_id: uuid.UUID):
+        await self._user_repo.mark_as_inactive(user_id)
+        await self._session_repo.revoke(session_id)
 
 
-def get_delete_user_use_case(
+def get_delete_me_use_case(
     user_repo: UserRepository = Depends(get_user_repo),
-) -> DeleteUserUseCase:
-    return DeleteUserUseCase(user_repo)
+    user_session_repo: UserSessionRepository = Depends(get_user_session_repo),
+) -> DeleteMeUseCase:
+    """
+    Dependency injection function to get DeleteMeUserCase instance.
+
+    Args:
+        user_repo: User repository instance injected by FastAPI
+        user_session_repo: User session repository instance injected by FastAPI
+
+    Returns:
+        DeleteMeUserCase instance configured with user repository
+    """
+    return DeleteMeUseCase(user_repo, user_session_repo)

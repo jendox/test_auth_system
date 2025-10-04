@@ -2,12 +2,25 @@ from uuid import UUID
 
 from fastapi import Depends
 
-from src.auth.repositories.refresh_token_repo import RefreshTokenRepository, get_refresh_token_repo
+from src.auth.repositories import RefreshTokenRepository, get_refresh_token_repo
 from src.core.utils import get_sha256hash
+from src.db.models import RefreshTokenEntity
 from src.token_manager import TokenManager, TokenPair, get_token_manager
+
+__all__ = (
+    "RefreshUseCase",
+    "get_refresh_use_case",
+)
 
 
 class RefreshUseCase:
+    """
+    Use case for refreshing authentication tokens.
+
+    Handles the secure rotation of access and refresh tokens,
+    implementing the refresh token flow with proper token revocation.
+    """
+
     def __init__(
         self,
         token_repo: RefreshTokenRepository,
@@ -16,9 +29,9 @@ class RefreshUseCase:
         self._token_repo = token_repo
         self._token_manager = token_manager
 
-    async def _save_refresh_token(self, session_id: UUID, token: str, exp: int):
+    async def _save_refresh_token(self, session_id: UUID, token: str, exp: int) -> RefreshTokenEntity:
         token_hash = get_sha256hash(token)
-        await self._token_repo.create(
+        return await self._token_repo.create(
             session_id=session_id,
             token_hash=token_hash,
             expires_at=exp,
@@ -44,4 +57,14 @@ def get_refresh_use_case(
     token_repo: RefreshTokenRepository = Depends(get_refresh_token_repo),
     token_manager: TokenManager = Depends(get_token_manager),
 ) -> RefreshUseCase:
+    """
+    Dependency injection function to get RefreshUseCase instance.
+
+    Args:
+        token_repo: Refresh token repository instance injected by FastAPI
+        token_manager: Token manager instance injected by FastAPI
+
+    Returns:
+        RefreshUseCase instance configured with dependencies
+    """
     return RefreshUseCase(token_repo, token_manager)
